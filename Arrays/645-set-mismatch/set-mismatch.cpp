@@ -1,3 +1,4 @@
+/* TC= O(n2)
 class Solution {
 public:
     vector<int> findErrorNums(vector<int>& nums) {
@@ -19,5 +20,32 @@ public:
             }
         }
         return {dup,missing};
+    }
+};
+*/
+
+
+// TC = O(nlogn)
+class Solution {
+public:
+    vector<int> findErrorNums(vector<int>& nums) {
+        int n = nums.size();
+        map<int,int> mp;
+        //frequency count
+        for(int i=0;i<n;i++){
+            mp[nums[i]]++;
+        }
+        int dup = 0;
+        int miss = 0;
+        // 1 to n check krenge
+        for(int i = 1; i <= n ; i++){
+            if(mp[i] == 2){
+                dup=i;
+            }
+            if(mp[i] == 0){
+                miss = i;
+            }
+        }
+        return {dup,miss};
     }
 };
