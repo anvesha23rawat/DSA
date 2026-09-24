@@ -1,118 +1,103 @@
 class Solution {
 public:
-    struct Node {
-        long long cnt[5] = {};
-        int prod = 1;
+    struct Node{
+        int cnt[5] = {0};
+        int prod = 0;
     };
-
-    int n, k;
-    vector<Node> tree;
-
-    Node merge(Node a, Node b) {
-        Node res;
-
-        res.prod = (long long)a.prod * b.prod % k;
-
-        // Prefix completely inside left
-        for (int r = 0; r < k; r++) {
-            res.cnt[r] += a.cnt[r];
+    class SegmentTree{
+    public:
+        int n,k;
+        vector<Node> segTree;
+        SegmentTree(vector<int>& nums,int k){
+            this->k = k;
+            n = nums.size();
+            segTree.assign(4*n,Node());
+            build(0,0,n-1,nums);
         }
-
-        // Prefix = whole left + prefix of right
-        for (int r = 0; r < k; r++) {
-            int nr = (long long)a.prod * r % k;
-            res.cnt[nr] += b.cnt[r];
+        void build(int i,int l,int r,vector<int>& nums){
+            if(l==r){
+                leafNode(i,nums[l]);
+                return;
+            }
+            int mid = l+(r-l)/2;
+            build(2*i+1,l,mid,nums);
+            build(2*i+2,mid+1,r,nums);
+            segTree[i] = mergeNode(segTree[2*i+1],segTree[2*i+2]);
         }
-
-        return res;
-    }
-
-    void build(vector<int>& nums, int p, int l, int r) {
-        if (l == r) {
-            int rem = nums[l] % k;
-
-            tree[p].prod = rem;
-            tree[p].cnt[rem] = 1;
-
-            return;
+        void leafNode(int i,int value){
+            for(int x=0;x<k;x++){
+                segTree[i].cnt[x] = 0;
+            }
+            int r = value % k;
+            segTree[i].cnt[r] = 1;
+            segTree[i].prod = r;
         }
-
-        int mid = (l + r) / 2;
-
-        build(nums, p * 2, l, mid);
-        build(nums, p * 2 + 1, mid + 1, r);
-
-        tree[p] = merge(tree[p * 2], tree[p * 2 + 1]);
-    }
-
-    void update(int p, int l, int r, int idx, int val) {
-        if (l == r) {
-            int rem = val % k;
-
-            tree[p] = Node();
-            tree[p].prod = rem;
-            tree[p].cnt[rem] = 1;
-
-            return;
+        Node mergeNode(Node &left,Node &right){
+            Node result;
+            result.prod = (left.prod * right.prod) % k;
+            for(int x = 0; x < k; x++){
+                result.cnt[x] = left.cnt[x];
+            }
+            for(int x = 0; x < k; x++ ){
+                int newRem = (left.prod * x) % k;
+                result.cnt[newRem] += right.cnt[x];
+            }
+            return result;
         }
-
-        int mid = (l + r) / 2;
-
-        if (idx <= mid)
-            update(p * 2, l, mid, idx, val);
-        else
-            update(p * 2 + 1, mid + 1, r, idx, val);
-
-        tree[p] = merge(tree[p * 2], tree[p * 2 + 1]);
-    }
-
-    Node query(int p, int l, int r, int ql, int qr) {
-        if (ql <= l && r <= qr) {
-            return tree[p];
+        void update(int index,int value){
+            segTreeUpdate(0,0,n-1,index,value);
         }
+        void segTreeUpdate(int i,int l,int r,int index,int value){
+            if(l==r){
+                leafNode(i,value);
+                return;
+            }
+            int mid = l+(r-l)/2;
+            if(index <= mid){
+                segTreeUpdate(2*i+1,l,mid,index,value);
+            }
+            else{
+                segTreeUpdate(2*i+2,mid+1,r,index,value);
+            }
+            segTree[i] = mergeNode(segTree[2*i+1],segTree[2*i+2]);
+        }
+        Node query(int start,int end){
+            //range is [start,end]
+            // i=0 -> index of root node of segment tree which covers the range of 0 to n-1 of nums
+            return segTreeQuery(start,end,0,0,n-1);
+        }
+        Node segTreeQuery(int start,int end,int i,int l,int r){
+            if(l >= start && r <= end){
+                return segTree[i];
+            }
+            int mid = l + (r-l)/2;
+            if(end <= mid){
+                return segTreeQuery(start,end,2*i+1,l,mid);
+            }
+            if(start > mid) {
+                return segTreeQuery(start,end,2*i+2,mid+1,r);
+            }
+            Node left = segTreeQuery(start,end,2*i+1,l,mid);
+            Node Right = segTreeQuery(start,end,2*i+2,mid+1,r);
+            return mergeNode(left,Right);
+        }
+    };
+    vector<int> resultArray(vector<int>& nums, int K, vector<vector<int>>& queries) {
+        int n = nums.size();
+        SegmentTree segTree(nums,K);
+        vector<int> result;
 
-        int mid = (l + r) / 2;
-
-        if (qr <= mid)
-            return query(p * 2, l, mid, ql, qr);
-
-        if (ql > mid)
-            return query(p * 2 + 1, mid + 1, r, ql, qr);
-
-        Node left = query(p * 2, l, mid, ql, qr);
-        Node right = query(p * 2 + 1, mid + 1, r, ql, qr);
-
-        return merge(left, right);
-    }
-
-    vector<int> resultArray(vector<int>& nums, int K,
-                            vector<vector<int>>& queries) {
-
-        n = nums.size();
-        k = K;
-
-        tree.resize(4 * n);
-
-        build(nums, 1, 0, n - 1);
-
-        vector<int> ans;
-        ans.reserve(queries.size());
-
-        for (auto &q : queries) {
+        for(auto& q : queries){
             int index = q[0];
             int value = q[1];
             int start = q[2];
             int x = q[3];
 
-            // Update persists
-            update(1, 0, n - 1, index, value);
+            segTree.update(index,value);
 
-            // Get nums[start ... n-1]
-            Node res = query(1, 0, n - 1, start, n - 1);
-
-            ans.push_back(res.cnt[x]);
+            Node node = segTree.query(start,n-1);
+            result.push_back(node.cnt[x]);
         }
-
-        return ans;
+        return result;
     }
 };
